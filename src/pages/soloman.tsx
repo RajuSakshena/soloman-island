@@ -23,68 +23,77 @@ const injectCSS = () => {
   style.id = "soloman-styles";
   style.innerHTML = `
     @keyframes pulse-ring {
-      0% { transform: scale(0.7); opacity: 0.9; }
-      50% { transform: scale(1.6); opacity: 0.25; }
-      100% { transform: scale(0.7); opacity: 0.9; }
+      0% { transform: scale(0.9); opacity: 0.5; }
+      50% { transform: scale(1.15); opacity: 0.15; }
+      100% { transform: scale(0.9); opacity: 0.5; }
     }
 
     @keyframes pulse-dot {
       0% { transform: scale(1); }
-      50% { transform: scale(1.25); }
+      50% { transform: scale(1.08); }
       100% { transform: scale(1); }
     }
 
-   .leaflet-marker-pane {
+  .leaflet-marker-pane {
       z-index: 650!important;
     }
 
-   .leaflet-tooltip-pane {
+  .leaflet-pane.leaflet-tooltip-pane {
       z-index: 1000!important;
     }
 
-   .soloman-tooltip-pane {
-      isolation: isolate!important;
-      position: relative!important;
-      z-index: 9999!important;
-      background: rgba(0,0,0,0.96)!important;
-      backdrop-filter: blur(16px)!important;
-      -webkit-backdrop-filter: blur(16px)!important;
-      border: 1px solid rgba(255,255,255,0.15)!important;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.9)!important;
-      padding: 0!important;
+  .leaflet-tooltip {
+      overflow: visible!important;
+      z-index: 1000!important;
     }
 
-   .soloman-tooltip-pane::before {
+  .soloman-tooltip-pane {
+      background: transparent!important;
+      border: none!important;
+      box-shadow: none!important;
+      padding: 0!important;
+      overflow: visible!important;
+      z-index: 1000!important;
+    }
+
+  .soloman-tooltip-pane::before {
       display: none!important;
     }
 
-   .pulse-marker-wrap {
+  .pulse-marker-wrap {
+      pointer-events: auto;
+      z-index: 600;
       position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
     }
 
-   .pulse-marker-ring {
+  .pulse-marker-ring {
       position: absolute;
       border-radius: 50%;
-      animation: pulse-ring 2.2s ease-in-out infinite;
+      animation: pulse-ring 3.2s ease-in-out infinite;
+      z-index: 1;
+      pointer-events: none;
+      opacity: 0.4;
     }
 
-   .pulse-marker-dot {
+  .pulse-marker-dot {
       border-radius: 50%;
       border: 1.5px solid rgba(255,255,255,0.85);
-      animation: pulse-dot 2.2s ease-in-out infinite;
+      animation: pulse-dot 3.2s ease-in-out infinite;
       position: relative;
       z-index: 2;
+      pointer-events: none;
+      opacity: 0.9;
     }
 
-   .leaflet-div-icon {
+  .leaflet-div-icon {
       background: transparent!important;
       border: none!important;
     }
 
-   .custom-marker {
+  .custom-marker {
       background: transparent!important;
       border: none!important;
     }
@@ -196,11 +205,11 @@ const getNDVIColor = (ndvi: number): string => {
 };
 
 const getNDVIGlow = (ndvi: number): string => {
-  if (ndvi >= 0.75) return "rgba(16,185,129,0.6)";
-  if (ndvi >= 0.55) return "rgba(52,211,153,0.6)";
-  if (ndvi >= 0.35) return "rgba(250,204,21,0.6)";
-  if (ndvi >= 0.15) return "rgba(251,146,60,0.6)";
-  return "rgba(239,68,68,0.6)";
+  if (ndvi >= 0.75) return "rgba(16,185,129,0.18)";
+  if (ndvi >= 0.55) return "rgba(52,211,153,0.16)";
+  if (ndvi >= 0.35) return "rgba(250,204,21,0.14)";
+  if (ndvi >= 0.15) return "rgba(251,146,60,0.12)";
+  return "rgba(239,68,68,0.10)";
 };
 
 // ==========================
@@ -230,8 +239,6 @@ const getMarkerIcon = (ndvi: number, size: number): L.DivIcon => {
 
   const glow = getNDVIGlow(ndvi);
   const ringSize = Math.round(size * 3.5);
-  const glowSoft = size * 2;
-  const glowStrong = size * 4;
   const half = Math.round(ringSize / 2);
 
   const icon = L.divIcon({
@@ -244,19 +251,16 @@ const getMarkerIcon = (ndvi: number, size: number): L.DivIcon => {
       width:${ringSize}px;
       height:${ringSize}px;
       background:${glow};
-      box-shadow: 0 0 ${glowStrong * 0.7}px ${glow};
-      opacity:0.7;
+      box-shadow: 0 0 ${size * 0.6}px ${glow};
     ">
   </div>
 
-  <div class="pulse-marker pulse-marker-dot"
+  <div class="pulse-marker-dot"
     style="
       width:${size}px;
       height:${size}px;
       background:${color};
-      box-shadow:
-        0 0 ${glowSoft}px ${color},
-        0 0 ${glowStrong}px ${glow};
+      box-shadow: 0 0 ${size * 0.4}px ${color}, 0 0 ${size * 0.8}px ${glow};
     ">
   </div>
 
@@ -420,16 +424,20 @@ function FitBounds({ data }: { data: Feature[] }) {
 function PointTooltip({ feature, lat, lng }: { feature: Feature; lat: number; lng: number }) {
   return (
     <div style={{
-      background: "rgba(5,5,10,0.92)",
-      backdropFilter: "blur(12px)",
-      border: "1px solid rgba(255,255,255,0.1)",
+      background: "rgba(5,5,10,0.96)",
+      backdropFilter: "blur(16px)",
+      WebkitBackdropFilter: "blur(16px)",
+      border: "1px solid rgba(255,255,255,0.15)",
       borderRadius: "10px",
       padding: "10px 13px",
       width: "185px",
       fontSize: "11px",
       color: "#fff",
-      boxShadow: "0 6px 28px rgba(0,0,0,0.6)",
+      boxShadow: "0 10px 40px rgba(0,0,0,0.9)",
       lineHeight: 1.5,
+      isolation: "isolate",
+      position: "relative",
+      zIndex: 9999,
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
         <span>📍</span>
@@ -479,12 +487,15 @@ function GeoPointsLayer({ densePoints, zoom }: { densePoints: DensePoint[]; zoom
         position={[pt.lat, pt.lng]}
         icon={getMarkerIcon(pt.feature.properties.NDVI, size)}
         pane="markers"
+        riseOnHover={true}
+        riseOffset={1000}
       >
         <Tooltip
           pane="tooltipPaneCustom"
           direction="top"
           offset={[0, -12]}
           opacity={1}
+          permanent={false}
           sticky={true}
           className="soloman-tooltip-pane"
         >
@@ -515,11 +526,11 @@ export default function Soloman() {
 
   useEffect(() => {
     fetch("/solomon_points_env.geojson")
-    .then((r) => r.json())
-    .then((j) => setData(j.features));
+   .then((r) => r.json())
+   .then((j) => setData(j.features));
     fetch("https://raw.githubusercontent.com/datasets/geo-boundaries-world-110m/master/countries/SLB.geojson")
-    .then((r) => r.json())
-    .then((j) => setBoundary(j));
+   .then((r) => r.json())
+   .then((j) => setBoundary(j));
   }, []);
 
   const densePoints = useMemo(() => generateDensePoints(data), [data]);
