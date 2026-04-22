@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import {
   MapContainer,
   CircleMarker,
@@ -6,9 +6,11 @@ import {
   TileLayer,
   GeoJSON,
   useMap,
+  useMapEvents,
   LayersControl,
   LayerGroup,
 } from "react-leaflet";
+import MarkerClusterGroup from "react-leaflet-cluster";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import "leaflet.heat";
@@ -28,6 +30,12 @@ type Feature = {
     SOIL: number;
     WATER: number;
   };
+};
+
+type DensePoint = {
+  lat: number;
+  lng: number;
+  feature: Feature;
 };
 
 // ==========================
@@ -100,6 +108,58 @@ const GRADIENTS: Record<string, Record<string, string>> = {
 };
 
 // ==========================
+// NDVI COLOR HELPER
+// ==========================
+const getNDVIColor = (ndvi: number): string => {
+  if (ndvi >= 0.75) return "#10b981";
+  if (ndvi >= 0.55) return "#34d399";
+  if (ndvi >= 0.35) return "#facc15";
+  if (ndvi >= 0.15) return "#fb923c";
+  return "#ef4444";
+};
+
+// ==========================
+// NDVI FILL COLOR (for markers)
+// ==========================
+const getNDVIFill = (ndvi: number): string => {
+  if (ndvi >= 0.75) return "#00ffcc";
+  if (ndvi >= 0.55) return "#34d399";
+  if (ndvi >= 0.35) return "#facc15";
+  if (ndvi >= 0.15) return "#fb923c";
+  return "#ef4444";
+};
+
+// ==========================
+// SEEDED JITTER (stable across renders)
+// ==========================
+function seededRandom(seed: number): number {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+}
+
+function generateDensePoints(features: Feature[]): DensePoint[] {
+  const points: DensePoint[] = [];
+  const COPIES = 4;
+  const OFFSET = 0.01;
+
+  features.forEach((f, fi) => {
+    const [lng, lat] = f.geometry.coordinates;
+    // Original point
+    points.push({ lat, lng, feature: f });
+    // Jittered copies with stable seed
+    for (let c = 0; c < COPIES; c++) {
+      const seed1 = fi * 100 + c * 7;
+      const seed2 = fi * 100 + c * 13 + 1;
+      const jLat = lat + (seededRandom(seed1) - 0.5) * OFFSET * 2;
+      const jLng = lng + (seededRandom(seed2) - 0.5) * OFFSET * 2;
+      points.push({ lat: jLat, lng: jLng, feature: f });
+    }
+  });
+
+  return points;
+}
+
+// ==========================
 // PANES
 // ==========================
 function MapPanes() {
@@ -107,16 +167,16 @@ function MapPanes() {
 
   useEffect(() => {
     if (!map.getPane("heatmap")) {
-      const heatmapPane = map.createPane("heatmap");
-      heatmapPane.style.zIndex = "350";
+      const p = map.createPane("heatmap");
+      p.style.zIndex = "350";
     }
     if (!map.getPane("boundary")) {
-      const boundaryPane = map.createPane("boundary");
-      boundaryPane.style.zIndex = "400";
+      const p = map.createPane("boundary");
+      p.style.zIndex = "400";
     }
     if (!map.getPane("markers")) {
-      const markersPane = map.createPane("markers");
-      markersPane.style.zIndex = "610";
+      const p = map.createPane("markers");
+      p.style.zIndex = "650";
     }
   }, [map]);
 
@@ -129,31 +189,56 @@ function MapPanes() {
 function HeatmapLayer({
   points,
   gradient,
+  visible,
 }: {
   points: HeatPoint[];
   gradient: Record<string, string>;
+  visible: boolean;
 }) {
   const map = useMap();
+  const heatRef = useRef<any>(null);
 
   useEffect(() => {
     if (!points.length) return;
 
     const heat = (L as any).heatLayer(points, {
-      radius: 52,
-      blur: 38,
-      maxZoom: 11,
-      minOpacity: 0.45,
+      radius: 25,
+      blur: 20,
+      maxZoom: 9,
+      minOpacity: 0.2,
       gradient,
       pane: "heatmap",
     });
 
+    heatRef.current = heat;
     heat.addTo(map);
 
     return () => {
       map.removeLayer(heat);
+      heatRef.current = null;
     };
   }, [points, map, gradient]);
 
+  useEffect(() => {
+    if (!heatRef.current) return;
+    const pane = map.getPane("heatmap");
+    if (pane) {
+      pane.style.display = visible ? "" : "none";
+    }
+  }, [visible, map]);
+
+  return null;
+}
+
+// ==========================
+// ZOOM TRACKER
+// ==========================
+function ZoomTracker({ onZoomChange }: { onZoomChange: (z: number) => void }) {
+  useMapEvents({
+    zoomend: (e) => {
+      onZoomChange(e.target.getZoom());
+    },
+  });
   return null;
 }
 
@@ -175,7 +260,6 @@ function ActiveLayerController({
       else if (name === "Soil Heatmap") onLayerChange("soil");
       else if (name === "Water Heatmap") onLayerChange("water");
     };
-
     map.on("overlayadd", handleOverlayAdd);
     return () => {
       map.off("overlayadd", handleOverlayAdd);
@@ -188,9 +272,8 @@ function ActiveLayerController({
 // ==========================
 // FIT BOUNDS
 // ==========================
-const FitBounds = ({ data }: { data: Feature[] }) => {
+function FitBounds({ data }: { data: Feature[] }) {
   const map = useMap();
-
   useEffect(() => {
     if (!data.length) return;
     const bounds = L.latLngBounds(
@@ -198,20 +281,136 @@ const FitBounds = ({ data }: { data: Feature[] }) => {
     );
     map.fitBounds(bounds, { padding: [40, 40] });
   }, [data, map]);
-
   return null;
-};
+}
 
 // ==========================
-// NDVI COLOR HELPER
+// TOOLTIP CONTENT
 // ==========================
-const getNDVIColor = (ndvi: number): string => {
-  if (ndvi >= 0.75) return "#10b981";
-  if (ndvi >= 0.55) return "#34d399";
-  if (ndvi >= 0.35) return "#facc15";
-  if (ndvi >= 0.15) return "#fb923c";
-  return "#ef4444";
-};
+function PointTooltip({
+  feature,
+  lat,
+  lng,
+}: {
+  feature: Feature;
+  lat: number;
+  lng: number;
+}) {
+  return (
+    <div className="bg-black/85 backdrop-blur-md border border-white/10 rounded-lg shadow-lg p-3 w-[180px] text-xs text-white">
+      <div className="flex items-center gap-1.5 mb-2">
+        <span className="text-sm">📍</span>
+        <span className="font-semibold tracking-tight">Location</span>
+      </div>
+      <div className="space-y-0.5 mb-3 text-[10px] font-mono">
+        <div className="flex justify-between">
+          <span className="text-gray-400">Lat</span>
+          <span className="text-white">{lat.toFixed(6)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-400">Lng</span>
+          <span className="text-white">{lng.toFixed(6)}</span>
+        </div>
+      </div>
+
+      <div className="border-t border-white/10 my-2" />
+
+      <div className="flex justify-between items-center py-1">
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm">🌿</span>
+          <span className="text-gray-400">NDVI</span>
+        </div>
+        <span className="font-semibold" style={{ color: getNDVIColor(feature.properties.NDVI) }}>
+          {feature.properties.NDVI.toFixed(2)}
+        </span>
+      </div>
+
+      <div className="flex justify-between items-center py-1">
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm">🌍</span>
+          <span className="text-gray-400">Land Use</span>
+        </div>
+        <span className="font-medium text-right">
+          {feature.properties.LULC} ({LULC_LABELS[feature.properties.LULC] || "Unknown"})
+        </span>
+      </div>
+
+      <div className="flex justify-between items-center py-1">
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm">🌱</span>
+          <span className="text-gray-400">Soil</span>
+        </div>
+        <span className="font-medium text-right">
+          {feature.properties.SOIL} ({SOIL_LABELS[feature.properties.SOIL] || "Unknown"})
+        </span>
+      </div>
+
+      <div className="flex justify-between items-center py-1">
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm">💧</span>
+          <span className="text-gray-400">Water</span>
+        </div>
+        <span className="font-semibold">{feature.properties.WATER}%</span>
+      </div>
+    </div>
+  );
+}
+
+// ==========================
+// GEO POINTS LAYER
+// ==========================
+function GeoPointsLayer({
+  densePoints,
+  zoom,
+}: {
+  densePoints: DensePoint[];
+  zoom: number;
+}) {
+  if (zoom < 7) return null;
+
+  const markers = densePoints.map((pt, i) => (
+    <CircleMarker
+      key={`pt-${i}`}
+      center={[pt.lat, pt.lng]}
+      radius={zoom > 10 ? 4 : 5}
+      pathOptions={{
+        stroke: false,
+        fillColor: getNDVIFill(pt.feature.properties.NDVI),
+        fillOpacity: 0.88,
+      }}
+      pane="markers"
+    >
+      <Tooltip
+        direction="right"
+        offset={[8, 0]}
+        sticky={true}
+        className="custom-tooltip"
+      >
+        <PointTooltip
+          feature={pt.feature}
+          lat={pt.feature.geometry.coordinates[1]}
+          lng={pt.feature.geometry.coordinates[0]}
+        />
+      </Tooltip>
+    </CircleMarker>
+  ));
+
+  if (zoom > 10) {
+    return <>{markers}</>;
+  }
+
+  return (
+    <MarkerClusterGroup
+      chunkedLoading
+      disableClusteringAtZoom={10}
+      spiderfyOnMaxZoom={true}
+      showCoverageOnHover={false}
+      maxClusterRadius={60}
+    >
+      {markers}
+    </MarkerClusterGroup>
+  );
+}
 
 // ==========================
 // MAIN
@@ -220,6 +419,7 @@ export default function Soloman() {
   const [data, setData] = useState<Feature[]>([]);
   const [boundary, setBoundary] = useState<any>(null);
   const [activeLayer, setActiveLayer] = useState<"ndvi" | "lulc" | "soil" | "water">("ndvi");
+  const [zoom, setZoom] = useState(6);
 
   useEffect(() => {
     fetch("/solomon_points_env.geojson")
@@ -233,45 +433,46 @@ export default function Soloman() {
       .then((json) => setBoundary(json));
   }, []);
 
-  const heatPoints: HeatPoint[] = useMemo(() => {
-    return data.map((f) => [
+  const densePoints = useMemo(() => generateDensePoints(data), [data]);
+
+  const heatPoints: HeatPoint[] = useMemo(() =>
+    data.map((f) => [
       f.geometry.coordinates[1],
       f.geometry.coordinates[0],
       f.properties.NDVI || 0,
-    ]);
-  }, [data]);
+    ]), [data]);
 
-  const lulcPoints: HeatPoint[] = useMemo(() => {
-    return data.map((f) => [
+  const lulcPoints: HeatPoint[] = useMemo(() =>
+    data.map((f) => [
       f.geometry.coordinates[1],
       f.geometry.coordinates[0],
       LULC_WEIGHT[f.properties.LULC] ?? 0,
-    ]);
-  }, [data]);
+    ]), [data]);
 
-  const soilPoints: HeatPoint[] = useMemo(() => {
-    return data.map((f) => [
+  const soilPoints: HeatPoint[] = useMemo(() =>
+    data.map((f) => [
       f.geometry.coordinates[1],
       f.geometry.coordinates[0],
       SOIL_WEIGHT[f.properties.SOIL] ?? 0,
-    ]);
-  }, [data]);
+    ]), [data]);
 
-  const waterPoints: HeatPoint[] = useMemo(() => {
-    return data.map((f) => [
+  const waterPoints: HeatPoint[] = useMemo(() =>
+    data.map((f) => [
       f.geometry.coordinates[1],
       f.geometry.coordinates[0],
       (f.properties.WATER || 0) / 100,
-    ]);
-  }, [data]);
+    ]), [data]);
+
+  const activeHeatPoints = useMemo(() => {
+    if (activeLayer === "ndvi") return heatPoints;
+    if (activeLayer === "lulc") return lulcPoints;
+    if (activeLayer === "soil") return soilPoints;
+    return waterPoints;
+  }, [activeLayer, heatPoints, lulcPoints, soilPoints, waterPoints]);
 
   const avgNDVI = useMemo(() => {
     if (!data.length) return 0;
-    const total = data.reduce(
-      (acc: number, f: Feature) => acc + (f.properties.NDVI || 0),
-      0
-    );
-    return total / data.length;
+    return data.reduce((acc, f) => acc + (f.properties.NDVI || 0), 0) / data.length;
   }, [data]);
 
   const getBoundaryColor = (ndvi: number): string => {
@@ -281,28 +482,34 @@ export default function Soloman() {
     return "#ef4444";
   };
 
-  const handleLayerChange = (layer: string) => {
+  const handleLayerChange = useCallback((layer: string) => {
     setActiveLayer(layer as "ndvi" | "lulc" | "soil" | "water");
-  };
+  }, []);
+
+  const handleZoomChange = useCallback((z: number) => {
+    setZoom(z);
+  }, []);
+
+  // Show heatmap only when zoom < 10
+  const heatmapVisible = zoom < 10;
 
   return (
     <div className="h-screen w-full bg-black">
-      <MapContainer center={[-9.5, 160]} zoom={6} className="h-full w-full">
+      <MapContainer
+        center={[-9.5, 160]}
+        zoom={6}
+        className="h-full w-full"
+        preferCanvas={true}
+      >
         <MapPanes />
+        <ZoomTracker onZoomChange={handleZoomChange} />
         <ActiveLayerController onLayerChange={handleLayerChange} />
 
-        {activeLayer === "ndvi" && (
-          <HeatmapLayer points={heatPoints} gradient={GRADIENTS.ndvi} />
-        )}
-        {activeLayer === "lulc" && (
-          <HeatmapLayer points={lulcPoints} gradient={GRADIENTS.lulc} />
-        )}
-        {activeLayer === "soil" && (
-          <HeatmapLayer points={soilPoints} gradient={GRADIENTS.soil} />
-        )}
-        {activeLayer === "water" && (
-          <HeatmapLayer points={waterPoints} gradient={GRADIENTS.water} />
-        )}
+        <HeatmapLayer
+          points={activeHeatPoints}
+          gradient={GRADIENTS[activeLayer]}
+          visible={heatmapVisible}
+        />
 
         <LayersControl position="topright">
           <LayersControl.BaseLayer checked name="Hybrid Map">
@@ -315,125 +522,19 @@ export default function Soloman() {
           <LayersControl.Overlay checked name="NDVI Heatmap">
             <LayerGroup />
           </LayersControl.Overlay>
-
           <LayersControl.Overlay name="LULC Heatmap">
             <LayerGroup />
           </LayersControl.Overlay>
-
           <LayersControl.Overlay name="Soil Heatmap">
             <LayerGroup />
           </LayersControl.Overlay>
-
           <LayersControl.Overlay name="Water Heatmap">
             <LayerGroup />
           </LayersControl.Overlay>
 
           <LayersControl.Overlay checked name="Geo Points">
             <LayerGroup>
-              {data.map((f, i) => {
-                const [lng, lat] = f.geometry.coordinates;
-                const center: [number, number] = [lat, lng];
-
-                return (
-                  <>
-                    <CircleMarker
-                      key={`hit-${i}`}
-                      center={center}
-                      radius={12}
-                      pathOptions={{
-                        color: "transparent",
-                        weight: 0,
-                        fillOpacity: 0,
-                      }}
-                      interactive={true}
-                      pane="markers"
-                    >
-                      <Tooltip
-                        direction="right"
-                        offset={[10, 0]}
-                        sticky={true}
-                        className="custom-tooltip"
-                      >
-                        <div className="bg-black/85 backdrop-blur-md border border-white/10 rounded-lg shadow-lg p-3 w-[180px] text-xs text-white">
-                          <div className="flex items-center gap-1.5 mb-2">
-                            <span className="text-sm">📍</span>
-                            <span className="font-semibold tracking-tight">Location</span>
-                          </div>
-                          <div className="space-y-0.5 mb-3 text-[10px] font-mono">
-                            <div className="flex justify-between">
-                              <span className="text-gray-400">Lat</span>
-                              <span className="text-white">{lat.toFixed(6)}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-400">Lng</span>
-                              <span className="text-white">{lng.toFixed(6)}</span>
-                            </div>
-                          </div>
-
-                          <div className="border-t border-white/10 my-2"></div>
-
-                          <div className="flex justify-between items-center py-1">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-sm">🌿</span>
-                              <span className="text-gray-400">NDVI</span>
-                            </div>
-                            <span
-                              className="font-semibold"
-                              style={{ color: getNDVIColor(f.properties.NDVI) }}
-                            >
-                              {f.properties.NDVI.toFixed(2)}
-                            </span>
-                          </div>
-
-                          <div className="flex justify-between items-center py-1">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-sm">🌍</span>
-                              <span className="text-gray-400">Land Use</span>
-                            </div>
-                            <span className="font-medium text-right">
-                              {f.properties.LULC} ({LULC_LABELS[f.properties.LULC] || "Unknown"})
-                            </span>
-                          </div>
-
-                          <div className="flex justify-between items-center py-1">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-sm">🌱</span>
-                              <span className="text-gray-400">Soil</span>
-                            </div>
-                            <span className="font-medium text-right">
-                              {f.properties.SOIL} ({SOIL_LABELS[f.properties.SOIL] || "Unknown"})
-                            </span>
-                          </div>
-
-                          <div className="flex justify-between items-center py-1">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-sm">💧</span>
-                              <span className="text-gray-400">Water</span>
-                            </div>
-                            <span className="font-semibold">
-                              {f.properties.WATER}%
-                            </span>
-                          </div>
-                        </div>
-                      </Tooltip>
-                    </CircleMarker>
-
-                    <CircleMarker
-                      key={`vis-${i}`}
-                      center={center}
-                      radius={6}
-                      pathOptions={{
-                        color: "white",
-                        weight: 2,
-                        fillColor: "#00ffcc",
-                        fillOpacity: 1,
-                      }}
-                      interactive={false}
-                      pane="markers"
-                    />
-                  </>
-                );
-              })}
+              <GeoPointsLayer densePoints={densePoints} zoom={zoom} />
             </LayerGroup>
           </LayersControl.Overlay>
 
