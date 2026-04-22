@@ -1,0 +1,325 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [157.01087309960027, -8.094910715055265]
+      },
+      "id": "1",
+      "properties": {
+        "LULC": 10,
+        "NDVI": 0.6442212462425232,
+        "SOIL": 6,
+        "WATER": 84,
+        "latitude": -8.094910715055265,
+        "longitude": 157.01087309960027
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [159.0774171744414, -7.936240896643506]
+      },
+      "id": "5",
+      "properties": {
+        "LULC": 10,
+        "NDVI": 0.7479870915412903,
+        "SOIL": 4,
+        "WATER": 1,
+        "latitude": -7.936240896643506,
+        "longitude": 159.0774171744414
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [160.08713266284772, -11.612242159252782]
+      },
+      "id": "14",
+      "properties": {
+        "LULC": 10,
+        "NDVI": 0.7361747622489929,
+        "SOIL": 4,
+        "WATER": 98,
+        "latitude": -11.612242159252782,
+        "longitude": 160.08713266284772
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [162.12383716072551, -10.65294755427504]
+      },
+      "id": "15",
+      "properties": {
+        "LULC": 10,
+        "NDVI": 0.6964399218559265,
+        "SOIL": 4,
+        "WATER": 1,
+        "latitude": -10.65294755427504,
+        "longitude": 162.12383716072551
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [159.74044102891963, -8.397325612559928]
+      },
+      "id": "17",
+      "properties": {
+        "LULC": 10,
+        "NDVI": 0.861765444278717,
+        "SOIL": 6,
+        "WATER": 89,
+        "latitude": -8.397325612559928,
+        "longitude": 159.74044102891963
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [160.91596871653468, -8.852437994229048]
+      },
+      "id": "29",
+      "properties": {
+        "LULC": 30,
+        "NDVI": 0.846970796585083,
+        "SOIL": 4,
+        "WATER": 25,
+        "latitude": -8.852437994229048,
+        "longitude": 160.91596871653468
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [161.9695795437029, -9.831414998272551]
+      },
+      "id": "33",
+      "properties": {
+        "LULC": 10,
+        "NDVI": 0.8346900343894958,
+        "SOIL": 1,
+        "WATER": 0,
+        "latitude": -9.831414998272551,
+        "longitude": 161.9695795437029
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [158.23156887259344, -8.786774600637592]
+      },
+      "id": "43",
+      "properties": {
+        "LULC": 10,
+        "NDVI": 0.7286432385444641,
+        "SOIL": 4,
+        "WATER": 99,
+        "latitude": -8.786774600637592,
+        "longitude": 158.23156887259344
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [158.201112804441, -8.665657943734733]
+      },
+      "id": "49",
+      "properties": {
+        "LULC": 80,
+        "NDVI": 0.7825515270233154,
+        "SOIL": 4,
+        "WATER": 99,
+        "latitude": -8.665657943734733,
+        "longitude": 158.201112804441
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [161.36845151144925, -9.582997250478025]
+      },
+      "id": "63",
+      "properties": {
+        "LULC": 80,
+        "NDVI": -0.042933810502290726,
+        "SOIL": 4,
+        "WATER": 94,
+        "latitude": -9.582997250478025,
+        "longitude": 161.36845151144925
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [159.70765672070038, -9.604016293124264]
+      },
+      "id": "77",
+      "properties": {
+        "LULC": 10,
+        "NDVI": 0.8443846106529236,
+        "SOIL": 4,
+        "WATER": 6,
+        "latitude": -9.604016293124264,
+        "longitude": 159.70765672070038
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [156.84455959736263, -8.10692720598353]
+      },
+      "id": "78",
+      "properties": {
+        "LULC": 50,
+        "NDVI": 0.3611128032207489,
+        "SOIL": 4,
+        "WATER": 96,
+        "latitude": -8.10692720598353,
+        "longitude": 156.84455959736263
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [160.2711442522863, -9.80586616274456]
+      },
+      "id": "86",
+      "properties": {
+        "LULC": 10,
+        "NDVI": 0.8257859945297241,
+        "SOIL": 6,
+        "WATER": 95,
+        "latitude": -9.80586616274456,
+        "longitude": 160.2711442522863
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [156.4546179815843, -6.602091087818788]
+      },
+      "id": "92",
+      "properties": {
+        "LULC": 10,
+        "NDVI": 0.8565044403076172,
+        "SOIL": 4,
+        "WATER": 93,
+        "latitude": -6.602091087818788,
+        "longitude": 156.4546179815843
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [160.12511550943074, -11.64985282794825]
+      },
+      "id": "112",
+      "properties": {
+        "LULC": 10,
+        "NDVI": 0.7959551811218262,
+        "SOIL": 4,
+        "WATER": 91,
+        "latitude": -11.64985282794825,
+        "longitude": 160.12511550943074
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [161.98694440747153, -9.728732768143528]
+      },
+      "id": "115",
+      "properties": {
+        "LULC": 10,
+        "NDVI": 0.5090967416763306,
+        "SOIL": 4,
+        "WATER": 91,
+        "latitude": -9.728732768143528,
+        "longitude": 161.98694440747153
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [160.7102339790256, -8.530307028523353]
+      },
+      "id": "124",
+      "properties": {
+        "LULC": 10,
+        "NDVI": 0.8175114989280701,
+        "SOIL": 6,
+        "WATER": 97,
+        "latitude": -8.530307028523353,
+        "longitude": 160.7102339790256
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [160.29508657767872, -9.53653417003736]
+      },
+      "id": "145",
+      "properties": {
+        "LULC": 10,
+        "NDVI": 0.823022723197937,
+        "SOIL": 4,
+        "WATER": 4,
+        "latitude": -9.53653417003736,
+        "longitude": 160.29508657767872
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [156.08599569480282, -6.8010270735876075]
+      },
+      "id": "166",
+      "properties": {
+        "LULC": 10,
+        "NDVI": 0.8749409914016724,
+        "SOIL": 4,
+        "WATER": 97,
+        "latitude": -6.8010270735876075,
+        "longitude": 156.08599569480282
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [156.90603949669514, -6.844586162252961]
+      },
+      "id": "198",
+      "properties": {
+        "LULC": 10,
+        "NDVI": 0.1824471354484558,
+        "SOIL": 6,
+        "WATER": 94,
+        "latitude": -6.844586162252961,
+        "longitude": 156.90603949669514
+      }
+    }
+  ]
+}
