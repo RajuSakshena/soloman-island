@@ -158,34 +158,6 @@ function HeatmapLayer({
 }
 
 // ==========================
-// LAYER EVENT LISTENER
-// ==========================
-function LayerEventHandler({
-  layerName,
-  onActivate,
-}: {
-  layerName: string;
-  onActivate: (name: string) => void;
-}) {
-  const map = useMap();
-
-  useEffect(() => {
-    const handleOverlayAdd = (e: any) => {
-      if (e.name === layerName) {
-        onActivate(layerName);
-      }
-    };
-
-    map.on("overlayadd", handleOverlayAdd);
-    return () => {
-      map.off("overlayadd", handleOverlayAdd);
-    };
-  }, [map, layerName, onActivate]);
-
-  return null;
-}
-
-// ==========================
 // ACTIVE LAYER CONTROLLER
 // ==========================
 function ActiveLayerController({
@@ -319,7 +291,6 @@ export default function Soloman() {
         <MapPanes />
         <ActiveLayerController onLayerChange={handleLayerChange} />
 
-        {/* Conditionally render only ONE heatmap at a time */}
         {activeLayer === "ndvi" && (
           <HeatmapLayer points={heatPoints} gradient={GRADIENTS.ndvi} />
         )}
@@ -334,7 +305,6 @@ export default function Soloman() {
         )}
 
         <LayersControl position="topright">
-          {/* Base Map */}
           <LayersControl.BaseLayer checked name="Hybrid Map">
             <LayerGroup>
               <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />
@@ -342,7 +312,6 @@ export default function Soloman() {
             </LayerGroup>
           </LayersControl.BaseLayer>
 
-          {/* Heatmap toggles — these are "dummy" overlays that trigger state changes only */}
           <LayersControl.Overlay checked name="NDVI Heatmap">
             <LayerGroup />
           </LayersControl.Overlay>
@@ -359,7 +328,6 @@ export default function Soloman() {
             <LayerGroup />
           </LayersControl.Overlay>
 
-          {/* Geo Points */}
           <LayersControl.Overlay checked name="Geo Points">
             <LayerGroup>
               {data.map((f, i) => {
@@ -469,7 +437,6 @@ export default function Soloman() {
             </LayerGroup>
           </LayersControl.Overlay>
 
-          {/* Boundary */}
           {boundary && (
             <LayersControl.Overlay checked name="Boundary">
               <GeoJSON
