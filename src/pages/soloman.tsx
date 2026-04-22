@@ -52,8 +52,55 @@ const SOIL_LABELS: Record<number, string> = {
   6: "Clay",
 };
 
+const LULC_WEIGHT: Record<number, number> = {
+  10: 1.0,
+  20: 0.8,
+  30: 0.6,
+  40: 0.5,
+  50: 0.3,
+  60: 0.2,
+  80: 0.1,
+};
+
+const SOIL_WEIGHT: Record<number, number> = {
+  6: 1.0,
+  5: 0.8,
+  4: 0.7,
+  3: 0.5,
+  2: 0.3,
+  1: 0.2,
+};
+
 // ==========================
-// PANES (for correct layering)
+// GRADIENTS
+// ==========================
+const GRADIENTS: Record<string, Record<string, string>> = {
+  ndvi: {
+    "0.0": "blue",
+    "0.3": "cyan",
+    "0.5": "yellow",
+    "0.7": "orange",
+    "1.0": "red",
+  },
+  lulc: {
+    "0.0": "#d9f99d",
+    "0.5": "#65a30d",
+    "1.0": "#14532d",
+  },
+  soil: {
+    "0.0": "#fef3c7",
+    "0.5": "#d97706",
+    "1.0": "#78350f",
+  },
+  water: {
+    "0.0": "#bfdbfe",
+    "0.5": "#3b82f6",
+    "1.0": "#1e3a8a",
+  },
+};
+
+// ==========================
+// PANES
 // ==========================
 function MapPanes() {
   const map = useMap();
@@ -63,12 +110,10 @@ function MapPanes() {
       const heatmapPane = map.createPane("heatmap");
       heatmapPane.style.zIndex = "350";
     }
-
     if (!map.getPane("boundary")) {
       const boundaryPane = map.createPane("boundary");
       boundaryPane.style.zIndex = "400";
     }
-
     if (!map.getPane("markers")) {
       const markersPane = map.createPane("markers");
       markersPane.style.zIndex = "610";
@@ -81,7 +126,13 @@ function MapPanes() {
 // ==========================
 // HEATMAP
 // ==========================
-function HeatmapLayer({ points }: { points: HeatPoint[] }) {
+function HeatmapLayer({
+  points,
+  gradient,
+}: {
+  points: HeatPoint[];
+  gradient: Record<string, string>;
+}) {
   const map = useMap();
 
   useEffect(() => {
@@ -92,13 +143,7 @@ function HeatmapLayer({ points }: { points: HeatPoint[] }) {
       blur: 38,
       maxZoom: 11,
       minOpacity: 0.45,
-      gradient: {
-        0.0: "blue",
-        0.3: "cyan",
-        0.5: "yellow",
-        0.7: "orange",
-        1.0: "red",
-      },
+      gradient,
       pane: "heatmap",
     });
 
@@ -107,7 +152,63 @@ function HeatmapLayer({ points }: { points: HeatPoint[] }) {
     return () => {
       map.removeLayer(heat);
     };
-  }, [points, map]);
+  }, [points, map, gradient]);
+
+  return null;
+}
+
+// ==========================
+// LAYER EVENT LISTENER
+// ==========================
+function LayerEventHandler({
+  layerName,
+  onActivate,
+}: {
+  layerName: string;
+  onActivate: (name: string) => void;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    const handleOverlayAdd = (e: any) => {
+      if (e.name === layerName) {
+        onActivate(layerName);
+      }
+    };
+
+    map.on("overlayadd", handleOverlayAdd);
+    return () => {
+      map.off("overlayadd", handleOverlayAdd);
+    };
+  }, [map, layerName, onActivate]);
+
+  return null;
+}
+
+// ==========================
+// ACTIVE LAYER CONTROLLER
+// ==========================
+function ActiveLayerController({
+  onLayerChange,
+}: {
+  onLayerChange: (layer: string) => void;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    const handleOverlayAdd = (e: any) => {
+      const name = e.name;
+      if (name === "NDVI Heatmap") onLayerChange("ndvi");
+      else if (name === "LULC Heatmap") onLayerChange("lulc");
+      else if (name === "Soil Heatmap") onLayerChange("soil");
+      else if (name === "Water Heatmap") onLayerChange("water");
+    };
+
+    map.on("overlayadd", handleOverlayAdd);
+    return () => {
+      map.off("overlayadd", handleOverlayAdd);
+    };
+  }, [map, onLayerChange]);
 
   return null;
 }
@@ -120,14 +221,9 @@ const FitBounds = ({ data }: { data: Feature[] }) => {
 
   useEffect(() => {
     if (!data.length) return;
-
     const bounds = L.latLngBounds(
-      data.map((f) => [
-        f.geometry.coordinates[1],
-        f.geometry.coordinates[0],
-      ])
+      data.map((f) => [f.geometry.coordinates[1], f.geometry.coordinates[0]])
     );
-
     map.fitBounds(bounds, { padding: [40, 40] });
   }, [data, map]);
 
@@ -151,6 +247,7 @@ const getNDVIColor = (ndvi: number): string => {
 export default function Soloman() {
   const [data, setData] = useState<Feature[]>([]);
   const [boundary, setBoundary] = useState<any>(null);
+  const [activeLayer, setActiveLayer] = useState<"ndvi" | "lulc" | "soil" | "water">("ndvi");
 
   useEffect(() => {
     fetch("/solomon_points_env.geojson")
@@ -172,6 +269,30 @@ export default function Soloman() {
     ]);
   }, [data]);
 
+  const lulcPoints: HeatPoint[] = useMemo(() => {
+    return data.map((f) => [
+      f.geometry.coordinates[1],
+      f.geometry.coordinates[0],
+      LULC_WEIGHT[f.properties.LULC] ?? 0,
+    ]);
+  }, [data]);
+
+  const soilPoints: HeatPoint[] = useMemo(() => {
+    return data.map((f) => [
+      f.geometry.coordinates[1],
+      f.geometry.coordinates[0],
+      SOIL_WEIGHT[f.properties.SOIL] ?? 0,
+    ]);
+  }, [data]);
+
+  const waterPoints: HeatPoint[] = useMemo(() => {
+    return data.map((f) => [
+      f.geometry.coordinates[1],
+      f.geometry.coordinates[0],
+      (f.properties.WATER || 0) / 100,
+    ]);
+  }, [data]);
+
   const avgNDVI = useMemo(() => {
     if (!data.length) return 0;
     const total = data.reduce(
@@ -188,10 +309,29 @@ export default function Soloman() {
     return "#ef4444";
   };
 
+  const handleLayerChange = (layer: string) => {
+    setActiveLayer(layer as "ndvi" | "lulc" | "soil" | "water");
+  };
+
   return (
     <div className="h-screen w-full bg-black">
       <MapContainer center={[-9.5, 160]} zoom={6} className="h-full w-full">
         <MapPanes />
+        <ActiveLayerController onLayerChange={handleLayerChange} />
+
+        {/* Conditionally render only ONE heatmap at a time */}
+        {activeLayer === "ndvi" && (
+          <HeatmapLayer points={heatPoints} gradient={GRADIENTS.ndvi} />
+        )}
+        {activeLayer === "lulc" && (
+          <HeatmapLayer points={lulcPoints} gradient={GRADIENTS.lulc} />
+        )}
+        {activeLayer === "soil" && (
+          <HeatmapLayer points={soilPoints} gradient={GRADIENTS.soil} />
+        )}
+        {activeLayer === "water" && (
+          <HeatmapLayer points={waterPoints} gradient={GRADIENTS.water} />
+        )}
 
         <LayersControl position="topright">
           {/* Base Map */}
@@ -202,14 +342,24 @@ export default function Soloman() {
             </LayerGroup>
           </LayersControl.BaseLayer>
 
-          {/* Heatmap */}
+          {/* Heatmap toggles — these are "dummy" overlays that trigger state changes only */}
           <LayersControl.Overlay checked name="NDVI Heatmap">
-            <LayerGroup>
-              <HeatmapLayer points={heatPoints} />
-            </LayerGroup>
+            <LayerGroup />
           </LayersControl.Overlay>
 
-          {/* Points with Improved Tooltip */}
+          <LayersControl.Overlay name="LULC Heatmap">
+            <LayerGroup />
+          </LayersControl.Overlay>
+
+          <LayersControl.Overlay name="Soil Heatmap">
+            <LayerGroup />
+          </LayersControl.Overlay>
+
+          <LayersControl.Overlay name="Water Heatmap">
+            <LayerGroup />
+          </LayersControl.Overlay>
+
+          {/* Geo Points */}
           <LayersControl.Overlay checked name="Geo Points">
             <LayerGroup>
               {data.map((f, i) => {
@@ -218,7 +368,6 @@ export default function Soloman() {
 
                 return (
                   <>
-                    {/* Hit area with fixed right-side tooltip */}
                     <CircleMarker
                       key={`hit-${i}`}
                       center={center}
@@ -238,7 +387,6 @@ export default function Soloman() {
                         className="custom-tooltip"
                       >
                         <div className="bg-black/85 backdrop-blur-md border border-white/10 rounded-lg shadow-lg p-3 w-[180px] text-xs text-white">
-                          {/* Location */}
                           <div className="flex items-center gap-1.5 mb-2">
                             <span className="text-sm">📍</span>
                             <span className="font-semibold tracking-tight">Location</span>
@@ -256,7 +404,6 @@ export default function Soloman() {
 
                           <div className="border-t border-white/10 my-2"></div>
 
-                          {/* NDVI */}
                           <div className="flex justify-between items-center py-1">
                             <div className="flex items-center gap-1.5">
                               <span className="text-sm">🌿</span>
@@ -270,7 +417,6 @@ export default function Soloman() {
                             </span>
                           </div>
 
-                          {/* Land Use */}
                           <div className="flex justify-between items-center py-1">
                             <div className="flex items-center gap-1.5">
                               <span className="text-sm">🌍</span>
@@ -281,7 +427,6 @@ export default function Soloman() {
                             </span>
                           </div>
 
-                          {/* Soil Type */}
                           <div className="flex justify-between items-center py-1">
                             <div className="flex items-center gap-1.5">
                               <span className="text-sm">🌱</span>
@@ -292,7 +437,6 @@ export default function Soloman() {
                             </span>
                           </div>
 
-                          {/* Water */}
                           <div className="flex justify-between items-center py-1">
                             <div className="flex items-center gap-1.5">
                               <span className="text-sm">💧</span>
@@ -306,7 +450,6 @@ export default function Soloman() {
                       </Tooltip>
                     </CircleMarker>
 
-                    {/* Visible marker */}
                     <CircleMarker
                       key={`vis-${i}`}
                       center={center}
