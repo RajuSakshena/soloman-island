@@ -23,54 +23,70 @@ const injectCSS = () => {
   style.id = "soloman-styles";
   style.innerHTML = `
     @keyframes pulse-ring {
-      0%   { transform: scale(0.8); opacity: 0.9; }
-      50%  { transform: scale(1.35); opacity: 0.3; }
-      100% { transform: scale(0.8); opacity: 0.9; }
+      0% { transform: scale(0.7); opacity: 0.9; }
+      50% { transform: scale(1.6); opacity: 0.25; }
+      100% { transform: scale(0.7); opacity: 0.9; }
     }
+
     @keyframes pulse-dot {
-      0%   { transform: scale(1); }
-      50%  { transform: scale(1.18); }
+      0% { transform: scale(1); }
+      50% { transform: scale(1.25); }
       100% { transform: scale(1); }
     }
-    .pulse-marker-wrap {
+
+   .leaflet-marker-pane {
+      z-index: 650!important;
+    }
+
+   .leaflet-tooltip-pane {
+      z-index: 1000!important;
+    }
+
+   .soloman-tooltip-pane {
+      isolation: isolate!important;
+      position: relative!important;
+      z-index: 9999!important;
+      background: rgba(0,0,0,0.96)!important;
+      backdrop-filter: blur(16px)!important;
+      -webkit-backdrop-filter: blur(16px)!important;
+      border: 1px solid rgba(255,255,255,0.15)!important;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.9)!important;
+      padding: 0!important;
+    }
+
+   .soloman-tooltip-pane::before {
+      display: none!important;
+    }
+
+   .pulse-marker-wrap {
       position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
     }
-    .pulse-marker-ring {
+
+   .pulse-marker-ring {
       position: absolute;
       border-radius: 50%;
       animation: pulse-ring 2.2s ease-in-out infinite;
     }
-    .pulse-marker-dot {
+
+   .pulse-marker-dot {
       border-radius: 50%;
       border: 1.5px solid rgba(255,255,255,0.85);
       animation: pulse-dot 2.2s ease-in-out infinite;
       position: relative;
       z-index: 2;
     }
-    .pulse-marker {
-      border-radius: 50%;
-      box-shadow: 0 0 8px currentColor, 0 0 18px currentColor;
-      transform: translate(-50%, -50%);
+
+   .leaflet-div-icon {
+      background: transparent!important;
+      border: none!important;
     }
-    .soloman-tooltip-pane {
-      background: transparent !important;
-      border: none !important;
-      box-shadow: none !important;
-      padding: 0 !important;
-    }
-    .soloman-tooltip-pane::before {
-      display: none !important;
-    }
-    .leaflet-div-icon {
-      background: transparent !important;
-      border: none !important;
-    }
-    .custom-marker {
-      background: transparent !important;
-      border: none !important;
+
+   .custom-marker {
+      background: transparent!important;
+      border: none!important;
     }
   `;
   document.head.appendChild(style);
@@ -191,9 +207,14 @@ const getNDVIGlow = (ndvi: number): string => {
 // MARKER SIZE BY ZOOM (FIXED SCALING)
 // ==========================
 const getMarkerSize = (zoom: number): number => {
-  if (zoom < 8) return 14;
-  if (zoom <= 12) return 10;
-  return 8;
+  if (zoom < 6) return 18;
+  if (zoom < 8) return 20;
+  if (zoom < 10) return 24;
+  if (zoom < 12) return 28;
+  if (zoom < 14) return 32;
+  if (zoom < 16) return 36;
+  if (zoom < 18) return 42;
+  return 48;
 };
 
 // ==========================
@@ -208,15 +229,39 @@ const getMarkerIcon = (ndvi: number, size: number): L.DivIcon => {
   if (iconCache.has(cacheKey)) return iconCache.get(cacheKey)!;
 
   const glow = getNDVIGlow(ndvi);
-  const ringSize = Math.round(size * 2.6);
+  const ringSize = Math.round(size * 3.5);
+  const glowSoft = size * 2;
+  const glowStrong = size * 4;
   const half = Math.round(ringSize / 2);
 
   const icon = L.divIcon({
     className: "custom-marker",
-    html: `<div class="pulse-marker-wrap" style="width:${ringSize}px;height:${ringSize}px;">
-      <div class="pulse-marker-ring" style="width:${ringSize}px;height:${ringSize}px;background:${glow};box-shadow:0 0 ${size * 2}px ${glow};"></div>
-      <div class="pulse-marker pulse-marker-dot" style="width:${size}px;height:${size}px;background:${color};box-shadow:0 0 ${size}px ${color},0 0 ${size * 2}px ${glow};"></div>
-    </div>`,
+    html: `
+<div class="pulse-marker-wrap" style="width:${ringSize}px;height:${ringSize}px;">
+
+  <div class="pulse-marker-ring"
+    style="
+      width:${ringSize}px;
+      height:${ringSize}px;
+      background:${glow};
+      box-shadow: 0 0 ${glowStrong * 0.7}px ${glow};
+      opacity:0.7;
+    ">
+  </div>
+
+  <div class="pulse-marker pulse-marker-dot"
+    style="
+      width:${size}px;
+      height:${size}px;
+      background:${color};
+      box-shadow:
+        0 0 ${glowSoft}px ${color},
+        0 0 ${glowStrong}px ${glow};
+    ">
+  </div>
+
+</div>
+`,
     iconSize: [ringSize, ringSize],
     iconAnchor: [half, half],
     tooltipAnchor: [half + 4, 0],
@@ -259,6 +304,11 @@ function generateDensePoints(features: Feature[]): DensePoint[] {
 // ==========================
 function MapPanes() {
   const map = useMap();
+
+  if (!map.getPane("tooltipPaneCustom")) {
+    const pane = map.createPane("tooltipPaneCustom");
+    pane.style.zIndex = "1000";
+  }
   useEffect(() => {
     if (!map.getPane("heatmap")) {
       const p = map.createPane("heatmap");
@@ -313,7 +363,7 @@ function HeatmapLayer({
     const pane = map.getPane("heatmap");
     if (pane) {
       pane.style.opacity = String(opacity);
-      pane.style.display = opacity > 0 ? "" : "none";
+      pane.style.display = opacity > 0? "" : "none";
     }
   }, [opacity, map]);
 
@@ -431,8 +481,9 @@ function GeoPointsLayer({ densePoints, zoom }: { densePoints: DensePoint[]; zoom
         pane="markers"
       >
         <Tooltip
+          pane="tooltipPaneCustom"
           direction="top"
-          offset={[0, -10]}
+          offset={[0, -12]}
           opacity={1}
           sticky={true}
           className="soloman-tooltip-pane"
@@ -464,11 +515,11 @@ export default function Soloman() {
 
   useEffect(() => {
     fetch("/solomon_points_env.geojson")
-      .then((r) => r.json())
-      .then((j) => setData(j.features));
+    .then((r) => r.json())
+    .then((j) => setData(j.features));
     fetch("https://raw.githubusercontent.com/datasets/geo-boundaries-world-110m/master/countries/SLB.geojson")
-      .then((r) => r.json())
-      .then((j) => setBoundary(j));
+    .then((r) => r.json())
+    .then((j) => setBoundary(j));
   }, []);
 
   const densePoints = useMemo(() => generateDensePoints(data), [data]);
@@ -477,10 +528,10 @@ export default function Soloman() {
     data.map((f) => [f.geometry.coordinates[1], f.geometry.coordinates[0], f.properties.NDVI || 0]),
     [data]);
   const lulcPoints: HeatPoint[] = useMemo(() =>
-    data.map((f) => [f.geometry.coordinates[1], f.geometry.coordinates[0], LULC_WEIGHT[f.properties.LULC] ?? 0]),
+    data.map((f) => [f.geometry.coordinates[1], f.geometry.coordinates[0], LULC_WEIGHT[f.properties.LULC]?? 0]),
     [data]);
   const soilPoints: HeatPoint[] = useMemo(() =>
-    data.map((f) => [f.geometry.coordinates[1], f.geometry.coordinates[0], SOIL_WEIGHT[f.properties.SOIL] ?? 0]),
+    data.map((f) => [f.geometry.coordinates[1], f.geometry.coordinates[0], SOIL_WEIGHT[f.properties.SOIL]?? 0]),
     [data]);
   const waterPoints: HeatPoint[] = useMemo(() =>
     data.map((f) => [f.geometry.coordinates[1], f.geometry.coordinates[0], (f.properties.WATER || 0) / 100]),
